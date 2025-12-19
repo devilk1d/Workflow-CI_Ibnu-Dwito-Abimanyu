@@ -1,4 +1,5 @@
 import os
+import urllib.parse
 import json
 import mlflow
 import joblib
@@ -122,7 +123,13 @@ with mlflow.start_run(run_name="Hyperparameter_Tuning"):
             mlflow.sklearn.log_model(model, artifact_path=model_folder)
             # Setelah log_model, tulis python_version ke artefak model
             model_uri = mlflow.get_artifact_uri(model_folder)
-            with open(os.path.join(model_uri, "python_version"), "w") as f:
+            # Hilangkan prefix file:// jika ada
+            if model_uri.startswith("file://"):
+                model_dir = urllib.parse.urlparse(model_uri).path
+            else:
+                model_dir = model_uri
+            os.makedirs(model_dir, exist_ok=True)
+            with open(os.path.join(model_dir, "python_version"), "w") as f:
                 f.write("3.9\n")
 
             # ---- Cleanup Local Files ----
@@ -191,7 +198,13 @@ with mlflow.start_run(run_name="Hyperparameter_Tuning"):
             mlflow.sklearn.log_model(model, artifact_path=model_folder)
             # Setelah log_model, tulis python_version ke artefak model
             model_uri = mlflow.get_artifact_uri(model_folder)
-            with open(os.path.join(model_uri, "python_version"), "w") as f:
+            # Hilangkan prefix file:// jika ada
+            if model_uri.startswith("file://"):
+                model_dir = urllib.parse.urlparse(model_uri).path
+            else:
+                model_dir = model_uri
+            os.makedirs(model_dir, exist_ok=True)
+            with open(os.path.join(model_dir, "python_version"), "w") as f:
                 f.write("3.9\n")
 
             # ---- Cleanup ----
