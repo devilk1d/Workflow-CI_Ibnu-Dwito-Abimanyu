@@ -18,8 +18,6 @@ jobs:
       - name: Set up Miniconda
         uses: conda-incubator/setup-miniconda@v3
         with:
-          environment-file: MLProject/conda.yaml
-          activate-environment: mlproject-env
           use-mamba: false
           auto-activate-base: false
       - name: Install MLflow
