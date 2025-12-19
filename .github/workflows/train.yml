@@ -49,11 +49,10 @@ jobs:
           if [ -z "$RUN_ID" ]; then echo "Model artifact not found!"; exit 1; fi
           echo "Found model artifact in run: $RUN_ID"
           
-          # Build docker image dari model artefak dengan flag --enable-mlserver false
+          # Build docker image dari model artefak (tanpa --enable-mlserver)
           mlflow models build-docker \
             -m mlruns/0/$RUN_ID/artifacts/model_nb_alpha_0.1 \
-            -n ${{ secrets.DOCKERHUB_USERNAME }}/mlproject-model:latest \
-            --enable-mlserver false
+            -n ${{ secrets.DOCKERHUB_USERNAME }}/mlproject-model:latest
 
       - name: Push Docker image
         run: |
