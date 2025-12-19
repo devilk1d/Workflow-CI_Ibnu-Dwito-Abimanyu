@@ -123,6 +123,7 @@ with mlflow.start_run(run_name="Hyperparameter_Tuning"):
             # Tambahkan file python_version agar MLflow build-docker pakai Python >=3.9
             run_id = mlflow.active_run().info.run_id
             model_dir = os.path.join("mlruns", "0", run_id, "artifacts", model_folder)
+            os.makedirs(model_dir, exist_ok=True)
             with open(os.path.join(model_dir, "python_version"), "w") as f:
                 f.write("3.9\n")
 
