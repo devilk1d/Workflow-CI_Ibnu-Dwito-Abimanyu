@@ -3,8 +3,10 @@ dependencies:
   - python=3.12
   - pip
   - pip:
-      - mlflow
+      - mlflow==2.12.1
       - scikit-learn
       - pandas
       - numpy
       - joblib
+      - matplotlib
+      - seaborn

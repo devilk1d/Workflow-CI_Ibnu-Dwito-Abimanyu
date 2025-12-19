@@ -21,7 +21,7 @@ jobs:
           use-mamba: false
           auto-activate-base: false
       - name: Install MLflow
-        run: pip install mlflow
+        run: pip install mlflow==2.12.1
       - name: Run MLflow Project
         run: mlflow run MLProject -P data_path=spam_email_dataset_cleaned.csv
         shell: bash -l {0}
