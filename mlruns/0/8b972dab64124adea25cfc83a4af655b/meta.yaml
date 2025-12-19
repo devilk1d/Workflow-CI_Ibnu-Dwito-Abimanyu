@@ -1,0 +1,15 @@
+artifact_uri: file:///D:/DATA/Kuliah/Asah/Project/Workflow-CI_Ibnu-Dwito-Abimanyu/mlruns/0/8b972dab64124adea25cfc83a4af655b/artifacts
+end_time: 1766151511479
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 8b972dab64124adea25cfc83a4af655b
+run_name: SVM_C_1.0
+run_uuid: 8b972dab64124adea25cfc83a4af655b
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1766151489425
+status: 3
+tags: []
+user_id: abima

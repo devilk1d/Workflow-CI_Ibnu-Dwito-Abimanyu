@@ -1,0 +1,15 @@
+artifact_uri: file:///D:/DATA/Kuliah/Asah/Project/Workflow-CI_Ibnu-Dwito-Abimanyu/mlruns/0/e22878a91fa2458cb55e6e22e6369eb0/artifacts
+end_time: 1766151464493
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: e22878a91fa2458cb55e6e22e6369eb0
+run_name: NB_alpha_0.1
+run_uuid: e22878a91fa2458cb55e6e22e6369eb0
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1766151461575
+status: 3
+tags: []
+user_id: abima

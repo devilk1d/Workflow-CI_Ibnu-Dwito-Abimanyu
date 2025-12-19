@@ -1,12 +1,12 @@
 import os
-import urllib.parse
 import json
 import mlflow
-import joblib
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import argparse
+import sys
+import sklearn
 
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
@@ -31,12 +31,19 @@ args = parser.parse_args()
 df = pd.read_csv(args.data_path)
 
 df["clean_text"] = df["clean_text"].fillna("").astype(str)
-X = TfidfVectorizer().fit_transform(df["clean_text"])
+
+# Save TfidfVectorizer for later use
+vectorizer = TfidfVectorizer()
+X = vectorizer.fit_transform(df["clean_text"])
 y = df["label_str"]
 
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.3, random_state=42
 )
+
+# Get current Python version
+python_version = f"{sys.version_info.major}.{sys.version_info.minor}"
+print(f"Using Python version: {python_version}")
 
 # ============================================================
 # 3. HYPERPARAMETER GRID
@@ -82,6 +89,7 @@ with mlflow.start_run(run_name="Hyperparameter_Tuning"):
             # ---- Manual Logging ----
             mlflow.log_param("model", "MultinomialNB")
             mlflow.log_param("alpha", alpha)
+            mlflow.log_param("python_version", python_version)
 
             mlflow.log_metric("accuracy", acc)
             mlflow.log_metric("precision_spam", report["spam"]["precision"])
@@ -116,25 +124,41 @@ with mlflow.start_run(run_name="Hyperparameter_Tuning"):
             pd.DataFrame(report).to_csv(report_path)
             mlflow.log_artifact(report_path)
 
-            # ---- Save Model (MLflow format) ----
-
-            # Log model (MLflow format)
+            # ---- Save Model (MLflow format) dengan conda_env ----
             model_folder = f"model_nb_alpha_{alpha}"
-            mlflow.sklearn.log_model(model, artifact_path=model_folder)
-            # Setelah log_model, tulis python_version ke artefak model
-            model_uri = mlflow.get_artifact_uri(model_folder)
-            # Hilangkan prefix file:// jika ada
-            if model_uri.startswith("file://"):
-                model_dir = urllib.parse.urlparse(model_uri).path
-            else:
-                model_dir = model_uri
-            os.makedirs(model_dir, exist_ok=True)
-            with open(os.path.join(model_dir, "python_version"), "w") as f:
-                f.write("3.9\n")
+            
+            # Create sample input for signature
+            sample_input = X_test[:1]
+            
+            # Define conda environment
+            conda_env = {
+                'name': 'mlflow-env',
+                'channels': ['conda-forge', 'defaults'],
+                'dependencies': [
+                    f'python={python_version}',
+                    'pip',
+                    {
+                        'pip': [
+                            f'mlflow=={mlflow.__version__}',
+                            f'scikit-learn=={sklearn.__version__}',
+                            'cloudpickle==2.2.1',
+                        ]
+                    }
+                ]
+            }
+            
+            mlflow.sklearn.log_model(
+                model, 
+                artifact_path=model_folder,
+                conda_env=conda_env,
+                input_example=sample_input
+            )
 
             # ---- Cleanup Local Files ----
-            os.remove(cm_path)
-            os.remove(report_path)
+            if os.path.exists(cm_path):
+                os.remove(cm_path)
+            if os.path.exists(report_path):
+                os.remove(report_path)
 
     # ========================================================
     # 6. SVM TUNING (NESTED RUN)
@@ -157,6 +181,7 @@ with mlflow.start_run(run_name="Hyperparameter_Tuning"):
             # ---- Manual Logging ----
             mlflow.log_param("model", "SVC")
             mlflow.log_param("C", C)
+            mlflow.log_param("python_version", python_version)
 
             mlflow.log_metric("accuracy", acc)
             mlflow.log_metric("precision_spam", report["spam"]["precision"])
@@ -191,24 +216,40 @@ with mlflow.start_run(run_name="Hyperparameter_Tuning"):
             pd.DataFrame(report).to_csv(report_path)
             mlflow.log_artifact(report_path)
 
-            # ---- Save Model (MLflow format) ----
-
-            # Log model (MLflow format)
+            # ---- Save Model (MLflow format) dengan conda_env ----
             model_folder = f"model_svm_C_{C}"
-            mlflow.sklearn.log_model(model, artifact_path=model_folder)
-            # Setelah log_model, tulis python_version ke artefak model
-            model_uri = mlflow.get_artifact_uri(model_folder)
-            # Hilangkan prefix file:// jika ada
-            if model_uri.startswith("file://"):
-                model_dir = urllib.parse.urlparse(model_uri).path
-            else:
-                model_dir = model_uri
-            os.makedirs(model_dir, exist_ok=True)
-            with open(os.path.join(model_dir, "python_version"), "w") as f:
-                f.write("3.9\n")
+            
+            # Create sample input for signature
+            sample_input = X_test[:1]
+            
+            # Define conda environment
+            conda_env = {
+                'name': 'mlflow-env',
+                'channels': ['conda-forge', 'defaults'],
+                'dependencies': [
+                    f'python={python_version}',
+                    'pip',
+                    {
+                        'pip': [
+                            f'mlflow=={mlflow.__version__}',
+                            f'scikit-learn=={sklearn.__version__}',
+                            'cloudpickle==2.2.1',
+                        ]
+                    }
+                ]
+            }
+            
+            mlflow.sklearn.log_model(
+                model, 
+                artifact_path=model_folder,
+                conda_env=conda_env,
+                input_example=sample_input
+            )
 
             # ---- Cleanup ----
-            os.remove(cm_path)
-            os.remove(report_path)
+            if os.path.exists(cm_path):
+                os.remove(cm_path)
+            if os.path.exists(report_path):
+                os.remove(report_path)
 
 print("Training & logging selesai. Cek MLflow UI & DagsHub.")
