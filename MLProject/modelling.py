@@ -1,7 +1,8 @@
 import os
 import json
 import mlflow
-import dagshub
+if not os.environ.get("GITHUB_ACTIONS"):
+    import dagshub
 import joblib
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -20,15 +21,19 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 
 print("Initializing MLflow Tracking (Local + DagsHub)...")
 
-mlflow.set_tracking_uri(
-    "https://dagshub.com/devilk1d/SMSML_Ibnu-Dwito-Abimanyu.mlflow"
-)
-
 dagshub.init(
-    repo_owner="devilk1d",
-    repo_name="SMSML_Ibnu-Dwito-Abimanyu",
-    mlflow=True
-)
+
+if not os.environ.get("GITHUB_ACTIONS"):
+    mlflow.set_tracking_uri(
+        "https://dagshub.com/devilk1d/SMSML_Ibnu-Dwito-Abimanyu.mlflow"
+    )
+
+if not os.environ.get("GITHUB_ACTIONS"):
+    dagshub.init(
+        repo_owner="devilk1d",
+        repo_name="SMSML_Ibnu-Dwito-Abimanyu",
+        mlflow=True
+    )
 
 # ============================================================
 # 2. LOAD DATA
