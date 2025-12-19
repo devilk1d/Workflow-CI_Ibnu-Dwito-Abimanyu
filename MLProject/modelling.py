@@ -1,8 +1,6 @@
 import os
 import json
 import mlflow
-if not os.environ.get("GITHUB_ACTIONS"):
-    import dagshub
 import joblib
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -16,24 +14,10 @@ from sklearn.svm import SVC
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 # ============================================================
-# 1. KONFIGURASI MLFLOW & DAGSHUB
+# 1. KONFIGURASI MLFLOW (LOCAL)
 # ============================================================
 
-print("Initializing MLflow Tracking (Local + DagsHub)...")
-
-dagshub.init(
-
-if not os.environ.get("GITHUB_ACTIONS"):
-    mlflow.set_tracking_uri(
-        "https://dagshub.com/devilk1d/SMSML_Ibnu-Dwito-Abimanyu.mlflow"
-    )
-
-if not os.environ.get("GITHUB_ACTIONS"):
-    dagshub.init(
-        repo_owner="devilk1d",
-        repo_name="SMSML_Ibnu-Dwito-Abimanyu",
-        mlflow=True
-    )
+print("Initializing MLflow Tracking (Local)...")
 
 # ============================================================
 # 2. LOAD DATA
