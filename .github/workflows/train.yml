@@ -40,6 +40,7 @@ jobs:
       - name: Build Docker image with MLflow
         run: |
           # Temukan run id terakhir (terbaru) yang punya artefak model_nb_alpha_0.1
+          pip install mlflow==2.12.1
           RUN_ID=$(ls mlruns/0 | grep -E '^[0-9a-f]+' | while read id; do if [ -d "mlruns/0/$id/artifacts/model_nb_alpha_0.1" ]; then echo $id; fi; done | tail -n1)
           if [ -z "$RUN_ID" ]; then echo "Model artifact not found!"; exit 1; fi
           # Build docker image dari model artefak
