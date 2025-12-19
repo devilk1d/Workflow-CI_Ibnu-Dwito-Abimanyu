@@ -41,8 +41,8 @@ jobs:
         run: |
           # Temukan run id terakhir (terbaru) dari mlruns/0
           RUN_ID=$(ls mlruns/0 | grep -E '^[0-9a-f]+' | sort | tail -n1)
-          # Build docker image dari model artefak (ganti model_nb_alpha_0.1.pkl jika model utama berbeda)
-          mlflow models build-docker -m mlruns/0/$RUN_ID/artifacts/model_nb_alpha_0.1.pkl -n ${{ secrets.DOCKERHUB_USERNAME }}/mlproject-model:latest
+          # Build docker image dari model artefak (ganti model_nb_alpha_0.1 ke model artefak yang diinginkan)
+          mlflow models build-docker -m mlruns/0/$RUN_ID/artifacts/model_nb_alpha_0.1 -n ${{ secrets.DOCKERHUB_USERNAME }}/mlproject-model:latest
 
       - name: Push Docker image
         run: |

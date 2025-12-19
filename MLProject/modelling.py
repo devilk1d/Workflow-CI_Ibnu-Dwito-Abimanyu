@@ -115,15 +115,12 @@ with mlflow.start_run(run_name="Hyperparameter_Tuning"):
             pd.DataFrame(report).to_csv(report_path)
             mlflow.log_artifact(report_path)
 
-            # ---- Save Model ----
-            model_path = f"model_nb_alpha_{alpha}.pkl"
-            joblib.dump(model, model_path)
-            mlflow.log_artifact(model_path)
+            # ---- Save Model (MLflow format) ----
+            mlflow.sklearn.log_model(model, artifact_path=f"model_nb_alpha_{alpha}")
 
             # ---- Cleanup Local Files ----
             os.remove(cm_path)
             os.remove(report_path)
-            os.remove(model_path)
 
     # ========================================================
     # 6. SVM TUNING (NESTED RUN)
@@ -180,14 +177,11 @@ with mlflow.start_run(run_name="Hyperparameter_Tuning"):
             pd.DataFrame(report).to_csv(report_path)
             mlflow.log_artifact(report_path)
 
-            # ---- Save Model ----
-            model_path = f"model_svm_C_{C}.pkl"
-            joblib.dump(model, model_path)
-            mlflow.log_artifact(model_path)
+            # ---- Save Model (MLflow format) ----
+            mlflow.sklearn.log_model(model, artifact_path=f"model_svm_C_{C}")
 
             # ---- Cleanup ----
             os.remove(cm_path)
             os.remove(report_path)
-            os.remove(model_path)
 
 print("Training & logging selesai. Cek MLflow UI & DagsHub.")
