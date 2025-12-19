@@ -39,9 +39,10 @@ jobs:
 
       - name: Build Docker image with MLflow
         run: |
-          # Temukan run id terakhir (terbaru) dari mlruns/0
-          RUN_ID=$(ls mlruns/0 | grep -E '^[0-9a-f]+' | sort | tail -n1)
-          # Build docker image dari model artefak (ganti model_nb_alpha_0.1 ke model artefak yang diinginkan)
+          # Temukan run id terakhir (terbaru) yang punya artefak model_nb_alpha_0.1
+          RUN_ID=$(ls mlruns/0 | grep -E '^[0-9a-f]+' | while read id; do if [ -d "mlruns/0/$id/artifacts/model_nb_alpha_0.1" ]; then echo $id; fi; done | tail -n1)
+          if [ -z "$RUN_ID" ]; then echo "Model artifact not found!"; exit 1; fi
+          # Build docker image dari model artefak
           mlflow models build-docker -m mlruns/0/$RUN_ID/artifacts/model_nb_alpha_0.1 -n ${{ secrets.DOCKERHUB_USERNAME }}/mlproject-model:latest
 
       - name: Push Docker image
