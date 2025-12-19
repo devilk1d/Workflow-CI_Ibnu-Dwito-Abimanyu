@@ -20,10 +20,13 @@ jobs:
         with:
           environment-file: MLProject/conda.yaml
           activate-environment: mlproject-env
+          use-mamba: false
+          auto-activate-base: false
       - name: Install MLflow
         run: pip install mlflow
       - name: Run MLflow Project
         run: mlflow run MLProject -P data_path=spam_email_dataset_cleaned.csv
+        shell: bash -l {0}
       - name: Upload model artifact
         uses: actions/upload-artifact@v3
         with:
