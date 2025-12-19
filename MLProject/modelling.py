@@ -25,7 +25,7 @@ print("Initializing MLflow Tracking (Local)...")
 # ============================================================
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--data_path', type=str, default='spam_email_dataset_cleaned.csv', help='Path to cleaned dataset CSV')
+parser.add_argument('--data_path', type=str, default='MLProject/spam_email_dataset_cleaned.csv', help='Path to cleaned dataset CSV')
 args = parser.parse_args()
 
 df = pd.read_csv(args.data_path)
