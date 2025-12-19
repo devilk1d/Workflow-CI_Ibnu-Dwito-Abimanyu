@@ -15,16 +15,21 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+        
       - name: Set up Miniconda
         uses: conda-incubator/setup-miniconda@v3
         with:
           use-mamba: false
           auto-activate-base: false
+          python-version: '3.9'
+          
       - name: Install MLflow
-        run: pip install mlflow==2.12.1
+        run: pip install mlflow==2.19.0
+        
       - name: Run MLflow Project
         run: mlflow run MLProject -P data_path=spam_email_dataset_cleaned.csv
         shell: bash -l {0}
+        
       - name: Upload model artifact
         uses: actions/upload-artifact@v4
         with:
@@ -40,11 +45,15 @@ jobs:
       - name: Build Docker image with MLflow
         run: |
           # Temukan run id terakhir (terbaru) yang punya artefak model_nb_alpha_0.1
-          pip install mlflow==2.12.1
           RUN_ID=$(ls mlruns/0 | grep -E '^[0-9a-f]+' | while read id; do if [ -d "mlruns/0/$id/artifacts/model_nb_alpha_0.1" ]; then echo $id; fi; done | tail -n1)
           if [ -z "$RUN_ID" ]; then echo "Model artifact not found!"; exit 1; fi
-          # Build docker image dari model artefak
-          mlflow models build-docker -m mlruns/0/$RUN_ID/artifacts/model_nb_alpha_0.1 -n ${{ secrets.DOCKERHUB_USERNAME }}/mlproject-model:latest
+          echo "Found model artifact in run: $RUN_ID"
+          
+          # Build docker image dari model artefak dengan flag --enable-mlserver false
+          mlflow models build-docker \
+            -m mlruns/0/$RUN_ID/artifacts/model_nb_alpha_0.1 \
+            -n ${{ secrets.DOCKERHUB_USERNAME }}/mlproject-model:latest \
+            --enable-mlserver false
 
       - name: Push Docker image
         run: |
