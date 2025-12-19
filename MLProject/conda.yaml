@@ -10,3 +10,4 @@ dependencies:
       - joblib
       - matplotlib
       - seaborn
+      - dagshub
