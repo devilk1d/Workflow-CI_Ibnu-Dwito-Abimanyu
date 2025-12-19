@@ -119,12 +119,14 @@ with mlflow.start_run(run_name="Hyperparameter_Tuning"):
 
             # Log model (MLflow format)
             model_folder = f"model_nb_alpha_{alpha}"
-            mlflow.sklearn.log_model(model, artifact_path=model_folder)
-            # Tambahkan file python_version agar MLflow build-docker pakai Python >=3.9
-            model_uri = mlflow.get_artifact_uri(model_folder)
-            os.makedirs(model_uri, exist_ok=True)
-            with open(os.path.join(model_uri, "python_version"), "w") as f:
+            # Tulis python_version ke folder sementara
+            python_version_path = f"python_version_nb_alpha_{alpha}"
+            with open(python_version_path, "w") as f:
                 f.write("3.9\n")
+            # Log model dengan extra_files agar python_version ikut ke artefak model
+            mlflow.sklearn.log_model(model, artifact_path=model_folder, extra_files=[python_version_path])
+            # Hapus file sementara
+            os.remove(python_version_path)
 
             # ---- Cleanup Local Files ----
             os.remove(cm_path)
@@ -189,12 +191,14 @@ with mlflow.start_run(run_name="Hyperparameter_Tuning"):
 
             # Log model (MLflow format)
             model_folder = f"model_svm_C_{C}"
-            mlflow.sklearn.log_model(model, artifact_path=model_folder)
-            # Tambahkan file python_version agar MLflow build-docker pakai Python >=3.9
-            model_uri = mlflow.get_artifact_uri(model_folder)
-            os.makedirs(model_uri, exist_ok=True)
-            with open(os.path.join(model_uri, "python_version"), "w") as f:
+            # Tulis python_version ke folder sementara
+            python_version_path = f"python_version_svm_C_{C}"
+            with open(python_version_path, "w") as f:
                 f.write("3.9\n")
+            # Log model dengan extra_files agar python_version ikut ke artefak model
+            mlflow.sklearn.log_model(model, artifact_path=model_folder, extra_files=[python_version_path])
+            # Hapus file sementara
+            os.remove(python_version_path)
 
             # ---- Cleanup ----
             os.remove(cm_path)
