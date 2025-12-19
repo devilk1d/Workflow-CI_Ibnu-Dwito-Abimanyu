@@ -116,7 +116,15 @@ with mlflow.start_run(run_name="Hyperparameter_Tuning"):
             mlflow.log_artifact(report_path)
 
             # ---- Save Model (MLflow format) ----
-            mlflow.sklearn.log_model(model, artifact_path=f"model_nb_alpha_{alpha}")
+
+            # Log model (MLflow format)
+            model_folder = f"model_nb_alpha_{alpha}"
+            mlflow.sklearn.log_model(model, artifact_path=model_folder)
+            # Tambahkan file python_version agar MLflow build-docker pakai Python >=3.9
+            run_id = mlflow.active_run().info.run_id
+            model_dir = os.path.join("mlruns", "0", run_id, "artifacts", model_folder)
+            with open(os.path.join(model_dir, "python_version"), "w") as f:
+                f.write("3.9\n")
 
             # ---- Cleanup Local Files ----
             os.remove(cm_path)
@@ -178,7 +186,15 @@ with mlflow.start_run(run_name="Hyperparameter_Tuning"):
             mlflow.log_artifact(report_path)
 
             # ---- Save Model (MLflow format) ----
-            mlflow.sklearn.log_model(model, artifact_path=f"model_svm_C_{C}")
+
+            # Log model (MLflow format)
+            model_folder = f"model_svm_C_{C}"
+            mlflow.sklearn.log_model(model, artifact_path=model_folder)
+            # Tambahkan file python_version agar MLflow build-docker pakai Python >=3.9
+            run_id = mlflow.active_run().info.run_id
+            model_dir = os.path.join("mlruns", "0", run_id, "artifacts", model_folder)
+            with open(os.path.join(model_dir, "python_version"), "w") as f:
+                f.write("3.9\n")
 
             # ---- Cleanup ----
             os.remove(cm_path)
