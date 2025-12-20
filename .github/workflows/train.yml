@@ -30,7 +30,7 @@ jobs:
     
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -38,7 +38,7 @@ jobs:
         python-version: '3.12'
         
     - name: Cache pip dependencies
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/.cache/pip
         key: ${{ runner.os }}-pip-${{ hashFiles('MLProject/conda.yaml') }}
@@ -113,7 +113,7 @@ jobs:
         
     - name: Upload artifacts to GitHub
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: model-artifacts-${{ github.run_number }}
         path: |
@@ -144,7 +144,7 @@ jobs:
         
     - name: Upload deployment info
       if: success()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: deployment-info
         path: deployment-info.txt
