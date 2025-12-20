@@ -1,1 +1,1 @@
-https://hub.docker.com/r/devilk1d/mlproject-model
+https://hub.docker.com/r/devilk1d/spam-email-detector

@@ -1,9 +1,18 @@
-name: MLProject
+name: SpamEmailDetection
 
 conda_env: conda.yaml
 
 entry_points:
   main:
     parameters:
-      data_path: {type: str, default: spam_email_dataset_cleaned.csv}
+      data_path: 
+        type: str
+        default: MLProject/spam_email_dataset_cleaned.csv
+    command: "python modelling.py --data_path {data_path}"
+  
+  train:
+    parameters:
+      data_path: 
+        type: str
+        default: MLProject/spam_email_dataset_cleaned.csv
     command: "python modelling.py --data_path {data_path}"

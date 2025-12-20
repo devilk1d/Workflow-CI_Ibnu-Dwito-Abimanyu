@@ -1,59 +1,172 @@
-# Workflow CI untuk MLProject
-# Melatih ulang model dan menyimpan artefak
-
-name: Train and Log Model
+name: ML Training CI/CD Pipeline
 
 on:
   push:
+    branches:
+      - main
+      - develop
     paths:
       - 'MLProject/**'
+      - '.github/workflows/train.yml'
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
+    inputs:
+      data_path:
+        description: 'Path to dataset'
+        required: false
+        default: 'MLProject/spam_email_dataset_cleaned.csv'
+
+env:
+  DAGSHUB_USER_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
+  MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+  DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+  DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
 
 jobs:
-  train:
+  train-model:
     runs-on: ubuntu-latest
+    
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
         
-      - name: Set up Miniconda
-        uses: conda-incubator/setup-miniconda@v3
-        with:
-          use-mamba: false
-          auto-activate-base: false
-          python-version: '3.9'
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('MLProject/conda.yaml') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
           
-      - name: Install MLflow
-        run: pip install mlflow==2.19.0
+    - name: Install Miniconda
+      uses: conda-incubator/setup-miniconda@v2
+      with:
+        auto-update-conda: true
+        python-version: 3.12
+        miniconda-version: "latest"
         
-      - name: Run MLflow Project
-        run: mlflow run MLProject -P data_path=spam_email_dataset_cleaned.csv
-        shell: bash -l {0}
+    - name: Install MLflow and dependencies
+      run: |
+        pip install --upgrade pip
+        pip install mlflow dagshub scikit-learn pandas numpy matplotlib joblib
         
-      - name: Upload model artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: trained-model
-          path: mlruns/
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Build Docker image with MLflow
-        run: |
-          # Temukan run id terakhir (terbaru) yang punya artefak model_nb_alpha_0.1
-          RUN_ID=$(ls mlruns/0 | grep -E '^[0-9a-f]+' | while read id; do if [ -d "mlruns/0/$id/artifacts/model_nb_alpha_0.1" ]; then echo $id; fi; done | tail -n1)
-          if [ -z "$RUN_ID" ]; then echo "Model artifact not found!"; exit 1; fi
-          echo "Found model artifact in run: $RUN_ID"
+    - name: Verify dataset exists
+      run: |
+        if [ -f "MLProject/spam_email_dataset_cleaned.csv" ]; then
+          echo "Dataset found!"
+          ls -lh MLProject/spam_email_dataset_cleaned.csv
+        else
+          echo "Warning: Dataset not found!"
+          exit 1
+        fi
+        
+    - name: Run MLflow Project
+      working-directory: ./MLProject
+      run: |
+        mlflow run . \
+          --env-manager=local \
+          -P data_path=MLProject/spam_email_dataset_cleaned.csv
           
-          # Build docker image dari model artefak (tanpa --enable-mlserver)
-          mlflow models build-docker \
-            -m mlruns/0/$RUN_ID/artifacts/model_nb_alpha_0.1 \
-            -n ${{ secrets.DOCKERHUB_USERNAME }}/mlproject-model:latest
-
-      - name: Push Docker image
-        run: |
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/mlproject-model:latest
+    - name: Build Docker Image with MLflow
+      run: |
+        cd MLProject
+        mlflow models build-docker \
+          -m "runs:/${{ github.run_id }}/spam_model_rf" \
+          -n "spam-email-detector:latest" \
+          --enable-mlserver || echo "Model URI not found, using alternative method"
+        
+        # Alternative: Build Docker manually if MLflow build fails
+        if [ $? -ne 0 ]; then
+          echo "Building Docker image manually..."
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/spam-email-detector:latest \
+                       -t ${{ secrets.DOCKERHUB_USERNAME }}/spam-email-detector:${{ github.sha }} \
+                       -f ../Dockerfile .
+        fi
+        
+    - name: Login to Docker Hub
+      if: success()
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+        
+    - name: Push Docker Image to Docker Hub
+      if: success()
+      run: |
+        docker tag spam-email-detector:latest ${{ secrets.DOCKERHUB_USERNAME }}/spam-email-detector:latest
+        docker tag spam-email-detector:latest ${{ secrets.DOCKERHUB_USERNAME }}/spam-email-detector:${{ github.sha }}
+        docker push ${{ secrets.DOCKERHUB_USERNAME }}/spam-email-detector:latest
+        docker push ${{ secrets.DOCKERHUB_USERNAME }}/spam-email-detector:${{ github.sha }}
+        
+    - name: Save artifacts to repository
+      if: always()
+      run: |
+        mkdir -p build-artifacts
+        cp -r MLProject/artifacts/* build-artifacts/ 2>/dev/null || echo "No artifacts to copy"
+        
+    - name: Upload artifacts to GitHub
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: model-artifacts-${{ github.run_number }}
+        path: |
+          build-artifacts/
+          MLProject/artifacts/
+        retention-days: 30
+        
+    - name: Create deployment info
+      if: success()
+      run: |
+        cat > deployment-info.txt << EOF
+        Deployment Information
+        ======================
+        Build Number: ${{ github.run_number }}
+        Commit SHA: ${{ github.sha }}
+        Branch: ${{ github.ref_name }}
+        Docker Image: ${{ secrets.DOCKERHUB_USERNAME }}/spam-email-detector:latest
+        Docker Hub URL: https://hub.docker.com/r/${{ secrets.DOCKERHUB_USERNAME }}/spam-email-detector
+        Timestamp: $(date -u)
+        
+        Pull Docker Image:
+        docker pull ${{ secrets.DOCKERHUB_USERNAME }}/spam-email-detector:latest
+        
+        Run Docker Container:
+        docker run -p 5000:5000 ${{ secrets.DOCKERHUB_USERNAME }}/spam-email-detector:latest
+        EOF
+        cat deployment-info.txt
+        
+    - name: Upload deployment info
+      if: success()
+      uses: actions/upload-artifact@v3
+      with:
+        name: deployment-info
+        path: deployment-info.txt
+        
+    - name: Comment on PR with results
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: `## 🤖 ML Training Pipeline Results
+            
+            ✅ Model training completed successfully!
+            
+            **Build Details:**
+            - Run Number: ${{ github.run_number }}
+            - Commit: ${{ github.sha }}
+            - Docker Image: \`${{ secrets.DOCKERHUB_USERNAME }}/spam-email-detector:latest\`
+            
+            **Artifacts:** Available in the Actions tab
+            `
+          })

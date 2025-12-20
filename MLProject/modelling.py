@@ -1,255 +1,161 @@
-import os
-import json
-import mlflow
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-import argparse
-import sys
-import sklearn
-
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
-from sklearn.naive_bayes import MultinomialNB
-from sklearn.svm import SVC
+import numpy as np
+import mlflow
+import mlflow.sklearn
+import dagshub
+from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import classification_report, confusion_matrix, ConfusionMatrixDisplay
+import matplotlib.pyplot as plt
+import os
+import argparse
+import joblib
 
-# ============================================================
-# 1. KONFIGURASI MLFLOW (LOCAL)
-# ============================================================
+# Setup DagsHub integration
+dagshub.init(repo_owner="devilk1d", repo_name="SMSML_Ibnu-Dwito-Abimanyu", mlflow=True)
 
-print("Initializing MLflow Tracking (Local)...")
+def train_advance(data_path):
+    """
+    Training function with MLflow tracking and artifact logging
+    """
+    # Load Preprocessed Data
+    print(f"Loading data from: {data_path}")
+    df = pd.read_csv(data_path)
+    X = df['clean_text'].astype(str)
+    y = df['label']
 
-# ============================================================
-# 2. LOAD DATA
-# ============================================================
+    # Split data
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42, stratify=y
+    )
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--data_path', type=str, default='MLProject/spam_email_dataset_cleaned.csv', help='Path to cleaned dataset CSV')
-args = parser.parse_args()
+    # Vectorization
+    print("Vectorizing text data...")
+    tfidf = TfidfVectorizer(max_features=3000)
+    X_train_tfidf = tfidf.fit_transform(X_train)
+    X_test_tfidf = tfidf.transform(X_test)
 
-df = pd.read_csv(args.data_path)
+    # Start MLflow run
+    with mlflow.start_run(run_name="RandomForest_CI_Training"):
+        print("Starting model training with hyperparameter tuning...")
+        
+        # Hyperparameter Tuning
+        rf = RandomForestClassifier(random_state=42)
+        param_grid = {
+            'n_estimators': [100, 200],
+            'max_depth': [10, 20, None],
+            'min_samples_split': [2, 5]
+        }
+        
+        grid_search = GridSearchCV(
+            rf, param_grid, cv=3, scoring='accuracy', 
+            n_jobs=-1, verbose=1
+        )
+        grid_search.fit(X_train_tfidf, y_train)
+        
+        best_model = grid_search.best_estimator_
+        
+        # Log parameters
+        print("Logging parameters...")
+        mlflow.log_params(grid_search.best_params_)
+        mlflow.log_param("test_size", 0.2)
+        mlflow.log_param("random_state", 42)
+        mlflow.log_param("max_features", 3000)
+        
+        # Log metrics
+        print("Logging metrics...")
+        mlflow.log_metric("best_cv_score", grid_search.best_score_)
+        
+        y_pred = best_model.predict(X_test_tfidf)
+        test_acc = best_model.score(X_test_tfidf, y_test)
+        mlflow.log_metric("test_accuracy", test_acc)
+        
+        print(f"Best CV Score: {grid_search.best_score_:.4f}")
+        print(f"Test Accuracy: {test_acc:.4f}")
 
-df["clean_text"] = df["clean_text"].fillna("").astype(str)
+        # Create artifacts directory
+        os.makedirs("artifacts", exist_ok=True)
 
-# Save TfidfVectorizer for later use
-vectorizer = TfidfVectorizer()
-X = vectorizer.fit_transform(df["clean_text"])
-y = df["label_str"]
+        # Artifact 1: Confusion Matrix
+        print("Creating confusion matrix...")
+        plt.figure(figsize=(8, 6))
+        ConfusionMatrixDisplay.from_estimator(
+            best_model, X_test_tfidf, y_test, 
+            cmap='Blues', values_format='d'
+        )
+        plt.title("Confusion Matrix - Spam Email Detection")
+        cm_path = "artifacts/confusion_matrix.png"
+        plt.savefig(cm_path, dpi=100, bbox_inches='tight')
+        plt.close()
+        mlflow.log_artifact(cm_path)
 
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.3, random_state=42
-)
+        # Artifact 2: Classification Report
+        print("Creating classification report...")
+        report = classification_report(y_test, y_pred)
+        report_path = "artifacts/classification_report.txt"
+        with open(report_path, "w") as f:
+            f.write("Classification Report - Spam Email Detection\n")
+            f.write("=" * 50 + "\n\n")
+            f.write(report)
+            f.write(f"\n\nBest Parameters: {grid_search.best_params_}\n")
+            f.write(f"Best CV Score: {grid_search.best_score_:.4f}\n")
+            f.write(f"Test Accuracy: {test_acc:.4f}\n")
+        mlflow.log_artifact(report_path)
 
-# Get current Python version
-python_version = f"{sys.version_info.major}.{sys.version_info.minor}"
-print(f"Using Python version: {python_version}")
+        # Artifact 3: Save vectorizer
+        print("Saving TF-IDF vectorizer...")
+        vectorizer_path = "artifacts/tfidf_vectorizer.pkl"
+        joblib.dump(tfidf, vectorizer_path)
+        mlflow.log_artifact(vectorizer_path)
 
-# ============================================================
-# 3. HYPERPARAMETER GRID
-# ============================================================
+        # Artifact 4: Model metadata
+        print("Creating model metadata...")
+        metadata = {
+            "model_type": "RandomForestClassifier",
+            "best_params": grid_search.best_params_,
+            "cv_score": float(grid_search.best_score_),
+            "test_accuracy": float(test_acc),
+            "training_samples": len(X_train),
+            "test_samples": len(X_test),
+            "features": 3000
+        }
+        metadata_path = "artifacts/model_metadata.txt"
+        with open(metadata_path, "w") as f:
+            for key, value in metadata.items():
+                f.write(f"{key}: {value}\n")
+        mlflow.log_artifact(metadata_path)
 
-param_grid_nb = {"alpha": [0.1, 0.5, 1.0]}
-param_grid_svm = {"C": [0.5, 1.0, 2.0]}
+        # Log Model
+        print("Logging model to MLflow...")
+        mlflow.sklearn.log_model(
+            best_model, 
+            "spam_model_rf",
+            registered_model_name="SpamEmailDetector"
+        )
+        
+        print("\n" + "="*50)
+        print("Training completed successfully!")
+        print(f"Best Parameters: {grid_search.best_params_}")
+        print(f"Test Accuracy: {test_acc:.4f}")
+        print("All artifacts logged to DagsHub/MLflow")
+        print("="*50)
 
-with open("param_grid_nb.json", "w") as f:
-    json.dump(param_grid_nb, f, indent=2)
+        return best_model, test_acc
 
-with open("param_grid_svm.json", "w") as f:
-    json.dump(param_grid_svm, f, indent=2)
-
-# ============================================================
-# 4. PARENT RUN (HYPERPARAMETER TUNING)
-# ============================================================
-
-with mlflow.start_run(run_name="Hyperparameter_Tuning"):
-
-    # --- Artefak global (ADVANCE) ---
-    mlflow.log_artifact("param_grid_nb.json")
-    mlflow.log_artifact("param_grid_svm.json")
-
-    # ========================================================
-    # 5. NAIVE BAYES TUNING (NESTED RUN)
-    # ========================================================
-
-    for alpha in param_grid_nb["alpha"]:
-        with mlflow.start_run(
-            run_name=f"NB_alpha_{alpha}",
-            nested=True
-        ):
-            model = MultinomialNB(alpha=alpha)
-            model.fit(X_train, y_train)
-
-            y_pred = model.predict(X_test)
-
-            acc = accuracy_score(y_test, y_pred)
-            report = classification_report(y_test, y_pred, output_dict=True)
-            cm = confusion_matrix(y_test, y_pred)
-
-            # ---- Manual Logging ----
-            mlflow.log_param("model", "MultinomialNB")
-            mlflow.log_param("alpha", alpha)
-            mlflow.log_param("python_version", python_version)
-
-            mlflow.log_metric("accuracy", acc)
-            mlflow.log_metric("precision_spam", report["spam"]["precision"])
-            mlflow.log_metric("recall_spam", report["spam"]["recall"])
-            mlflow.log_metric("f1_spam", report["spam"]["f1-score"])
-            mlflow.log_metric("precision_ham", report["ham"]["precision"])
-            mlflow.log_metric("recall_ham", report["ham"]["recall"])
-            mlflow.log_metric("f1_ham", report["ham"]["f1-score"])
-
-            # ---- Confusion Matrix ----
-            plt.figure(figsize=(6, 5))
-            sns.heatmap(
-                cm,
-                annot=True,
-                fmt="d",
-                cmap="Blues",
-                xticklabels=sorted(y.unique()),
-                yticklabels=sorted(y.unique())
-            )
-            plt.title("Confusion Matrix - MultinomialNB")
-            plt.xlabel("Predicted")
-            plt.ylabel("Actual")
-            plt.tight_layout()
-
-            cm_path = f"cm_nb_alpha_{alpha}.png"
-            plt.savefig(cm_path)
-            plt.close()
-            mlflow.log_artifact(cm_path)
-
-            # ---- Classification Report ----
-            report_path = f"report_nb_alpha_{alpha}.csv"
-            pd.DataFrame(report).to_csv(report_path)
-            mlflow.log_artifact(report_path)
-
-            # ---- Save Model (MLflow format) dengan conda_env ----
-            model_folder = f"model_nb_alpha_{alpha}"
-            
-            # Create sample input for signature
-            sample_input = X_test[:1]
-            
-            # Define conda environment
-            conda_env = {
-                'name': 'mlflow-env',
-                'channels': ['conda-forge', 'defaults'],
-                'dependencies': [
-                    f'python={python_version}',
-                    'pip',
-                    {
-                        'pip': [
-                            f'mlflow=={mlflow.__version__}',
-                            f'scikit-learn=={sklearn.__version__}',
-                            'cloudpickle==2.2.1',
-                        ]
-                    }
-                ]
-            }
-            
-            mlflow.sklearn.log_model(
-                model, 
-                artifact_path=model_folder,
-                conda_env=conda_env,
-                input_example=sample_input
-            )
-
-            # ---- Cleanup Local Files ----
-            if os.path.exists(cm_path):
-                os.remove(cm_path)
-            if os.path.exists(report_path):
-                os.remove(report_path)
-
-    # ========================================================
-    # 6. SVM TUNING (NESTED RUN)
-    # ========================================================
-
-    for C in param_grid_svm["C"]:
-        with mlflow.start_run(
-            run_name=f"SVM_C_{C}",
-            nested=True
-        ):
-            model = SVC(kernel="linear", C=C, probability=True)
-            model.fit(X_train, y_train)
-
-            y_pred = model.predict(X_test)
-
-            acc = accuracy_score(y_test, y_pred)
-            report = classification_report(y_test, y_pred, output_dict=True)
-            cm = confusion_matrix(y_test, y_pred)
-
-            # ---- Manual Logging ----
-            mlflow.log_param("model", "SVC")
-            mlflow.log_param("C", C)
-            mlflow.log_param("python_version", python_version)
-
-            mlflow.log_metric("accuracy", acc)
-            mlflow.log_metric("precision_spam", report["spam"]["precision"])
-            mlflow.log_metric("recall_spam", report["spam"]["recall"])
-            mlflow.log_metric("f1_spam", report["spam"]["f1-score"])
-            mlflow.log_metric("precision_ham", report["ham"]["precision"])
-            mlflow.log_metric("recall_ham", report["ham"]["recall"])
-            mlflow.log_metric("f1_ham", report["ham"]["f1-score"])
-
-            # ---- Confusion Matrix ----
-            plt.figure(figsize=(6, 5))
-            sns.heatmap(
-                cm,
-                annot=True,
-                fmt="d",
-                cmap="Blues",
-                xticklabels=sorted(y.unique()),
-                yticklabels=sorted(y.unique())
-            )
-            plt.title("Confusion Matrix - SVM")
-            plt.xlabel("Predicted")
-            plt.ylabel("Actual")
-            plt.tight_layout()
-
-            cm_path = f"cm_svm_C_{C}.png"
-            plt.savefig(cm_path)
-            plt.close()
-            mlflow.log_artifact(cm_path)
-
-            # ---- Classification Report ----
-            report_path = f"report_svm_C_{C}.csv"
-            pd.DataFrame(report).to_csv(report_path)
-            mlflow.log_artifact(report_path)
-
-            # ---- Save Model (MLflow format) dengan conda_env ----
-            model_folder = f"model_svm_C_{C}"
-            
-            # Create sample input for signature
-            sample_input = X_test[:1]
-            
-            # Define conda environment
-            conda_env = {
-                'name': 'mlflow-env',
-                'channels': ['conda-forge', 'defaults'],
-                'dependencies': [
-                    f'python={python_version}',
-                    'pip',
-                    {
-                        'pip': [
-                            f'mlflow=={mlflow.__version__}',
-                            f'scikit-learn=={sklearn.__version__}',
-                            'cloudpickle==2.2.1',
-                        ]
-                    }
-                ]
-            }
-            
-            mlflow.sklearn.log_model(
-                model, 
-                artifact_path=model_folder,
-                conda_env=conda_env,
-                input_example=sample_input
-            )
-
-            # ---- Cleanup ----
-            if os.path.exists(cm_path):
-                os.remove(cm_path)
-            if os.path.exists(report_path):
-                os.remove(report_path)
-
-print("Training & logging selesai. Cek MLflow UI & DagsHub.")
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Train spam email detection model')
+    parser.add_argument(
+        '--data_path', 
+        type=str, 
+        default='MLProject/spam_email_dataset_cleaned.csv',
+        help='Path to the cleaned dataset'
+    )
+    
+    args = parser.parse_args()
+    
+    # Set MLflow tracking URI
+    mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "http://127.0.0.1:5000"))
+    
+    # Train model
+    train_advance(args.data_path)

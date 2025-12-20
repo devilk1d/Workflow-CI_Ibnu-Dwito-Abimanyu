@@ -1,13 +1,15 @@
-name: mlproject-env
+channels:
+- conda-forge
 dependencies:
-  - python=3.9
-  - pip
-  - pip:
-      - mlflow==2.19.0
-      - scikit-learn
-      - pandas
-      - numpy
-      - joblib
-      - matplotlib
-      - seaborn
-      - dagshub
+- python=3.12.0
+- pip<=23.2.1
+- pip:
+  - mlflow==2.19.0
+  - cloudpickle==3.1.2
+  - numpy==2.3.5
+  - pandas==2.3.3
+  - psutil==7.1.3
+  - pyarrow==18.1.0
+  - scikit-learn==1.8.0
+  - scipy==1.16.3
+name: mlflow-env
